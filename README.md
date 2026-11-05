@@ -10,9 +10,16 @@ Terraform for AWS.
 
 ## Demo
 
-Demo video coming at `docs/demo.gif` — run it locally in 2 minutes with
-the quickstart below (seed data included: two live sites go green, one
-dead address goes red).
+![uptime-monitor demo: dashboard, outage and recovery](docs/demo.gif)
+
+*17-second demo from a live local run — [MP4 version](docs/demo.mp4),
+walkthrough in [docs/demo.md](docs/demo.md). The dashboard starts empty;
+two monitors are added: a demo website (UP) and a dead address (DOWN).
+The demo site is then stopped for real — the dashboard flags it DOWN
+within one check interval — and it recovers when the site comes back,
+with the outage visible in its history. The recording uses local
+stand-in sites so the outage is reproducible on cue; on a normal network
+the seed script monitors github.com and tu-dortmund.de the same way.*
 
 ## Features
 
