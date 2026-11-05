@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>uptime-monitor</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d; --text: #e6edf3;
+    --muted: #8b949e; --green: #3fb950; --red: #f85149; --grey: #6e7681;
+    --accent: #58a6ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  header {
+    padding: 20px 28px 8px; display: flex; flex-wrap: wrap; gap: 16px;
+    align-items: baseline; justify-content: space-between;
+  }
+  h1 { font-size: 22px; margin: 0; }
+  h1 span { color: var(--muted); font-weight: 400; font-size: 14px; }
+  .stats { display: flex; gap: 18px; flex-wrap: wrap; }
+  .stat { text-align: right; }
+  .stat b { font-size: 20px; display: block; }
+  .stat small { color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: .08em; }
+  main { padding: 14px 28px 34px; max-width: 1180px; margin: 0 auto; }
+  form {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px; display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;
+  }
+  input {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 9px 11px; font-size: 14px;
+  }
+  input[name="name"] { width: 180px; }
+  input[name="url"] { flex: 1; min-width: 240px; }
+  input[name="interval"] { width: 110px; }
+  button {
+    background: #21262d; color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 13px; font-size: 13px; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px;
+  }
+  .card h2 { font-size: 16px; margin: 0 0 2px; display: flex; justify-content: space-between; align-items: center; }
+  .card .url { color: var(--muted); font-size: 12px; word-break: break-all; margin-bottom: 10px; }
+  .pill {
+    font-size: 11px; font-weight: 700; letter-spacing: .06em; padding: 3px 10px; border-radius: 999px;
+  }
+  .pill.up { background: rgba(63,185,80,.15); color: var(--green); border: 1px solid var(--green); }
+  .pill.down { background: rgba(248,81,73,.15); color: var(--red); border: 1px solid var(--red); }
+  .pill.pending { background: rgba(110,118,129,.15); color: var(--grey); border: 1px solid var(--grey); }
+  .facts { display: flex; gap: 16px; color: var(--muted); font-size: 12px; margin: 8px 0; flex-wrap: wrap; }
+  .facts b { color: var(--text); font-size: 14px; }
+  .spark { width: 100%; height: 44px; display: block; margin: 6px 0 10px; }
+  .actions { display: flex; gap: 8px; }
+  .empty { color: var(--muted); text-align: center; padding: 48px 0; font-size: 15px; }
+  .error { color: var(--red); font-size: 13px; margin: -8px 0 12px; min-height: 16px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>uptime-monitor <span>— is it up?</span></h1>
+  <div class="stats">
+    <div class="stat"><b id="st-total">–</b><small>monitors</small></div>
+    <div class="stat"><b id="st-up" style="color:var(--green)">–</b><small>up</small></div>
+    <div class="stat"><b id="st-down" style="color:var(--red)">–</b><small>down</small></div>
+    <div class="stat"><b id="st-lat">–</b><small>avg latency</small></div>
+    <div class="stat"><b id="st-checks">–</b><small>checks</small></div>
+  </div>
+</header>
+<main>
+  <form id="add-form">
+    <input name="name" placeholder="Name (e.g. GitHub)" required maxlength="100">
+    <input name="url" placeholder="https://example.com" required>
+    <input name="interval" type="number" min="10" max="3600" value="60" title="Check interval (seconds)">
+    <button class="primary" type="submit">Add monitor</button>
+  </form>
+  <div class="error" id="form-error"></div>
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty" hidden>No monitors yet — add your first site above.</div>
+</main>
+<script>
+const grid = document.getElementById('grid');
+const empty = document.getElementById('empty');
+
+function sparkline(checks) {
+  if (!checks || checks.length === 0) return '<svg class="spark"></svg>';
+  const W = 300, H = 44, P = 3;
+  const lats = checks.map(c => (c.latency_ms == null ? 0 : c.latency_ms));
+  const max = Math.max(...lats, 1);
+  const step = checks.length > 1 ? (W - 2 * P) / (checks.length - 1) : 0;
+  const xy = checks.map((c, i) => {
+    const x = P + i * step;
+    const y = c.is_up ? H - P - (lats[i] / max) * (H - 2 * P) : H - P;
+    return [x, y, c.is_up];
+  });
+  const line = xy.filter(p => p[2]).map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+  const dots = xy.map(p =>
+    '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="2.4" fill="' +
+    (p[2] ? '#3fb950' : '#f85149') + '"/>').join('');
+  return '<svg class="spark" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
+    (line ? '<polyline points="' + line + '" fill="none" stroke="#58a6ff" stroke-width="1.6"/>' : '') +
+    dots + '</svg>';
+}
+
+function card(m) {
+  const last = m.last_check;
+  const state = !last ? 'pending' : (last.is_up ? 'up' : 'down');
+  const label = state === 'up' ? 'UP' : state === 'down' ? 'DOWN' : 'PENDING';
+  const latency = last && last.latency_ms != null ? Math.round(last.latency_ms) + ' ms' : '—';
+  const uptime = m.uptime_pct == null ? '—' : m.uptime_pct + ' %';
+  const err = last && last.error ? '<div class="facts"><span title="' +
+    last.error.replace(/"/g, '&quot;') + '">last error: ' +
+    last.error.slice(0, 60).replace(/</g, '&lt;') + '…</span></div>' : '';
+  return '<div class="card">' +
+    '<h2>' + m.name.replace(/</g, '&lt;') + ' <span class="pill ' + state + '">' + label + '</span></h2>' +
+    '<div class="url">' + m.url.replace(/</g, '&lt;') + '</div>' +
+    sparkline(m.recent_checks) +
+    '<div class="facts"><span>latency <b>' + latency + '</b></span>' +
+    '<span>uptime <b>' + uptime + '</b></span>' +
+    '<span>checks <b>' + m.checks_count + '</b></span>' +
+    '<span>every <b>' + m.interval_seconds + 's</b></span></div>' + err +
+    '<div class="actions"><button onclick="checkNow(' + m.id + ')">Check now</button>' +
+    '<button onclick="removeMonitor(' + m.id + ')">Delete</button></div></div>';
+}
+
+async function refresh() {
+  try {
+    const [monitors, stats] = await Promise.all([
+      fetch('/api/monitors').then(r => r.json()),
+      fetch('/api/stats').then(r => r.json())
+    ]);
+    document.getElementById('st-total').textContent = stats.monitors_total;
+    document.getElementById('st-up').textContent = stats.monitors_up;
+    document.getElementById('st-down').textContent = stats.monitors_down;
+    document.getElementById('st-lat').textContent =
+      stats.avg_latency_ms == null ? '—' : Math.round(stats.avg_latency_ms) + ' ms';
+    document.getElementById('st-checks').textContent = stats.checks_total;
+    grid.innerHTML = monitors.map(card).join('');
+    empty.hidden = monitors.length > 0;
+  } catch (e) { /* API momentarily unreachable; next tick retries */ }
+}
+
+async function checkNow(id) {
+  await fetch('/api/monitors/' + id + '/check', {method: 'POST'});
+  refresh();
+}
+async function removeMonitor(id) {
+  await fetch('/api/monitors/' + id, {method: 'DELETE'});
+  refresh();
+}
+
+document.getElementById('add-form').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const f = ev.target;
+  const body = {
+    name: f.name.value.trim(),
+    url: f.url.value.trim(),
+    interval_seconds: parseInt(f.interval.value, 10) || 60
+  };
+  const res = await fetch('/api/monitors', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+  });
+  const errBox = document.getElementById('form-error');
+  if (res.ok) {
+    errBox.textContent = '';
+    f.reset(); f.interval.value = 60;
+    refresh();
+  } else {
+    const data = await res.json().catch(() => ({}));
+    errBox.textContent = 'Could not add monitor: ' + (data.detail || res.status);
+  }
+});
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>
