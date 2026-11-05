@@ -17,7 +17,7 @@ data "aws_subnets" "default" {
 }
 
 locals {
-  name = "${var.project_name}-${var.environment}"
+  name         = "${var.project_name}-${var.environment}"
   database_url = "postgresql+psycopg2://${var.db_username}:${var.db_password}@${aws_db_instance.main.endpoint}/${var.db_name}"
 }
 
@@ -26,7 +26,7 @@ locals {
 # ---------------------------------------------------------------------------
 
 resource "aws_ecr_repository" "main" {
-  name                 = "${local.name}"
+  name                 = local.name
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {
