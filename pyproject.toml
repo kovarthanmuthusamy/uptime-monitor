@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uptime-monitor"
+version = "0.1.0"
+description = "A small uptime monitoring service: FastAPI + worker + dashboard, Docker and Terraform/AWS included."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Kovarthanam Muthusamy" }]
+
+[tool.setuptools]
+packages = ["app"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# B008 (function call in argument defaults) is the standard FastAPI
+# dependency-injection idiom: Depends(...) belongs in the signature.
+ignore = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
