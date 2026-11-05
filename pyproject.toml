@@ -21,7 +21,10 @@ target-version = "py311"
 [tool.ruff.lint]
 # B008 (function call in argument defaults) is the standard FastAPI
 # dependency-injection idiom: Depends(...) belongs in the signature.
-ignore = ["B008"]
+# EXE001 (shebang without executable bit): scripts are always invoked as
+# `python scripts/...`, and files pushed through GitHub's web editor
+# cannot carry the executable bit.
+ignore = ["B008", "EXE001"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
