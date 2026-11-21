@@ -1,3 +1,5 @@
+![cover](cover.png)
+
 # uptime-monitor
 
 A small uptime monitoring service — a mini-Pingdom. Register the websites
